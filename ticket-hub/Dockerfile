@@ -1,0 +1,11 @@
+FROM eclipse-temurin:17-jre
+
+LABEL authors="DELL"
+
+WORKDIR /app
+
+COPY target/ticket-hub-local-0.0.1-SNAPSHOT.jar app.jar
+
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "app.jar"]

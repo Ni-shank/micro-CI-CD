@@ -1,0 +1,26 @@
+# IDE
+.idea/
+*.iml
+
+# Build output
+**/target/
+**/build/
+**/out/
+
+# Backup
+ticket-hub-backup/
+
+# Environment and secrets
+.env
+**/.env
+.env.*
+**/.env.*
+!**/.env.example
+
+# Local configuration
+**/application-local.yml
+**/application-local.yaml
+**/application-local.properties
+
+# Logs
+*.log

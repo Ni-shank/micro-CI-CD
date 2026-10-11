@@ -1,0 +1,138 @@
+# =====================================================================
+# TicketHub - Notification Service
+# =====================================================================
+
+server:
+  port: ${SERVER_PORT:8085}
+
+spring:
+  application:
+    name: notification-service
+
+  # ============================================================
+  # MySQL
+  # MySQL is running on Windows host
+  # ============================================================
+  datasource:
+    url: ${DB_URL:jdbc:mysql://host.docker.internal:3306/notificationdb?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: false
+
+  # ============================================================
+  # Email
+  # Docker MailHog
+  # ============================================================
+  mail:
+    host: ${MAIL_HOST:mailhog}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${MAIL_STARTTLS:false}
+      mail.smtp.starttls.required: false
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
+
+  # ============================================================
+  # Kafka
+  # ============================================================
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:tickethub-kafka:9092}
+
+    consumer:
+      group-id: ${NOTIFICATION_KAFKA_GROUP:notification-service}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        max.block.ms: 5000
+
+    admin:
+      properties:
+        request.timeout.ms: 5000
+        default.api.timeout.ms: 8000
+
+
+# ================================================================
+# Notification Configuration
+# ================================================================
+notification:
+
+  mail:
+    from: ${MAIL_FROM:notification@tickethub.com}
+    from-name: ${MAIL_FROM_NAME:TicketHub}
+    support-email: ${MAIL_SUPPORT:support@tickethub.com}
+    brand-name: TicketHub
+    blocked-domains: ${MAIL_BLOCKED_DOMAINS:}
+
+  retry:
+    max-attempts: 5
+    initial-backoff-seconds: 30
+    multiplier: 2.0
+    max-backoff-seconds: 1800
+    scan-ms: 15000
+    lease-seconds: 120
+    batch-size: 50
+
+  kafka:
+    enabled: ${NOTIFICATION_KAFKA_ENABLED:true}
+    payment-topic: ${PAYMENT_TOPIC:payment-events}
+    booking-topic: ${BOOKING_TOPIC:booking-events}
+    group-id: ${NOTIFICATION_KAFKA_GROUP:notification-service}
+
+  security:
+    api-key: ${NOTIFICATION_API_KEY:}
+
+  events:
+    enabled:
+      payment-success: true
+      payment-failed: true
+      payment-refunded: true
+      booking-confirmed: true
+      booking-cancelled: true
+      booking-expired: true
+
+
+# ================================================================
+# Actuator
+# ================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+  endpoint:
+    health:
+      show-details: always
+
+  health:
+    mail:
+      enabled: false
+
+
+# ================================================================
+# Logging
+# ================================================================
+logging:
+  level:
+    root: INFO
+    com.tickethub.notification: DEBUG
+    org.apache.kafka: WARN
+    org.springframework.kafka: WARN
+
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

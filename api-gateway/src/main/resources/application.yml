@@ -1,0 +1,348 @@
+# =====================================================================
+# TicketHub - API Gateway
+# =====================================================================
+
+server:
+  port: ${SERVER_PORT:8090}
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+
+      httpclient:
+        connect-timeout: 3000
+        response-timeout: 30s
+
+      # ================================================================
+      # CORS
+      # ================================================================
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+
+        cors-configurations:
+          '[/**]':
+            allowed-origin-patterns: ${CORS_ALLOWED_ORIGINS:*}
+
+            allowed-methods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+
+            allowed-headers: "*"
+
+            exposed-headers:
+              - X-Request-Id
+              - Retry-After
+
+            allow-credentials: false
+
+            max-age: 3600
+
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
+
+      # ================================================================
+      # ROUTES
+      # ================================================================
+      routes:
+
+        # ================================================================
+        # USER SERVICE
+        # Container: user-service-container
+        # Port: 8089
+        # ================================================================
+        - id: user-service
+
+          uri: ${USER_SERVICE_URI:http://user-service-container:8089}
+
+          predicates:
+            - Path=/api/auth/**,/api/users/**,/api/admin/**
+
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: userServiceCB
+                fallbackUri: forward:/fallback/user-service
+
+
+        # ================================================================
+        # BOOKING SERVICE
+        # Container: booking-service-container
+        # Port: 8083
+        # ================================================================
+        - id: booking-service
+
+          uri: ${BOOKING_SERVICE_URI:http://booking-service-container:8083}
+
+          predicates:
+            - Path=/bookings/**,/razorpay-checkout-test.html
+
+          metadata:
+            connect-timeout: 3000
+            response-timeout: 60000
+
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: bookingServiceCB
+                fallbackUri: forward:/fallback/booking-service
+
+
+        # ================================================================
+        # EVENT SERVICE
+        # Container: ticket-hub-container
+        # Port: 8080
+        # ================================================================
+        - id: event-service
+
+          uri: ${EVENT_SERVICE_URI:http://ticket-hub-container:8080}
+
+          predicates:
+            - Path=/api/events/**,/api/venues/**,/api/shows/**,/api/v1/shows/**,/api/v1/venues/**,/api/v1/halls/**,/api/v1/seats/**
+
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: eventServiceCB
+                fallbackUri: forward:/fallback/event-service
+
+
+        # ================================================================
+        # PAYMENT SERVICE
+        # Container: payment-service-container
+        # Port: 8081
+        # ================================================================
+        - id: payment-service
+
+          uri: ${PAYMENT_SERVICE_URI:http://payment-service-container:8081}
+
+          predicates:
+            - Path=/api/v1/payments/**
+
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: paymentServiceCB
+                fallbackUri: forward:/fallback/payment-service
+
+
+        # ================================================================
+        # NOTIFICATION SERVICE
+        # Container: notification-service-container
+        # Port: 8085
+        # ================================================================
+        - id: notification-service
+
+          uri: ${NOTIFICATION_SERVICE_URI:http://notification-service-container:8085}
+
+          predicates:
+            - Path=/api/notifications/**
+
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: notificationServiceCB
+                fallbackUri: forward:/fallback/notification-service
+
+
+# =====================================================================
+# EUREKA
+# =====================================================================
+
+eureka:
+
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://service-registry-container:8761/eureka/}
+
+    registry-fetch-interval-seconds: 5
+
+    register-with-eureka: true
+
+    fetch-registry: true
+
+  instance:
+    hostname: ${EUREKA_INSTANCE_HOSTNAME:api-gateway-container}
+
+    prefer-ip-address: true
+
+
+# =====================================================================
+# GATEWAY SECURITY
+# =====================================================================
+
+gateway:
+
+  security:
+
+    # IMPORTANT:
+    # This secret must be exactly the same in Gateway
+    # and the service that validates the JWT.
+    jwt-secret: ${JWT_SECRET}
+
+    default-access: AUTHENTICATED
+
+    rules:
+
+      # ================================================================
+      # OPTIONS / CORS
+      # ================================================================
+      - methods:
+          - OPTIONS
+        paths:
+          - /**
+        access: PUBLIC
+
+
+      # ================================================================
+      # USER SERVICE
+      # ================================================================
+
+      # Login/Register do NOT require JWT
+      - methods:
+          - POST
+        paths:
+          - /api/auth/register
+          - /api/auth/login
+        access: PUBLIC
+
+      # Admin APIs require ADMIN role
+      - paths:
+          - /api/admin/**
+        access: ADMIN
+
+      # User APIs require authentication
+      - paths:
+          - /api/users/**
+        access: AUTHENTICATED
+
+
+      # ================================================================
+      # NOTIFICATION SERVICE
+      # ================================================================
+
+      - paths:
+          - /api/notifications/**
+        access: ADMIN
+
+
+      # ================================================================
+      # PAYMENT SERVICE
+      # ================================================================
+
+      # Razorpay webhook does not require JWT
+      - methods:
+          - POST
+        paths:
+          - /api/v1/payments/webhook
+        access: PUBLIC
+
+      - paths:
+          - /api/v1/payments/**
+        access: AUTHENTICATED
+
+
+      # ================================================================
+      # EVENT SERVICE
+      # ================================================================
+
+      # Public read operations
+      - methods:
+          - GET
+          - HEAD
+        paths:
+          - /api/events/**
+          - /api/venues/**
+          - /api/shows/**
+          - /api/v1/shows/**
+          - /api/v1/venues/**
+          - /api/v1/halls/**
+          - /api/v1/seats/**
+        access: PUBLIC
+
+      # Admin write operations
+      - paths:
+          - /api/events/**
+          - /api/venues/**
+          - /api/shows/**
+          - /api/v1/shows/**
+          - /api/v1/venues/**
+          - /api/v1/halls/**
+          - /api/v1/seats/**
+        access: ADMIN
+
+
+      # ================================================================
+      # BOOKING SERVICE
+      # ================================================================
+
+      - methods:
+          - GET
+        paths:
+          - /razorpay-checkout-test.html
+        access: PUBLIC
+
+      - paths:
+          - /bookings/**
+        access: AUTHENTICATED
+
+
+  # ====================================================================
+  # RATE LIMITING
+  # ====================================================================
+
+  rate-limit:
+
+    enabled: ${RATE_LIMIT_ENABLED:true}
+
+    default-limit: 300
+
+    window-seconds: 60
+
+    rules:
+
+      - paths:
+          - /api/auth/**
+        limit: 10
+
+      - paths:
+          - /bookings/**
+        limit: 60
+
+
+# =====================================================================
+# ACTUATOR
+# =====================================================================
+
+management:
+
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+  endpoint:
+    health:
+      show-details: never
+
+
+# =====================================================================
+# LOGGING
+# =====================================================================
+
+logging:
+
+  level:
+    root: INFO
+
+    com.tickethub.gateway: DEBUG
+
+    com.netflix.discovery: WARN
+
+    com.netflix.eureka: WARN

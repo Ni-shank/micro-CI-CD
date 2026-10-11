@@ -1,0 +1,44 @@
+server:
+  port: 8089
+
+spring:
+  application:
+    name: user-service
+
+  datasource:
+#    url: jdbc:mysql://host.docker.internal:3306/tickethub_user_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    url: jdbc:mysql://localhost:3306/tickethub_user_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://service-registry-container:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+    registry-fetch-interval-seconds: 5
+
+  instance:
+    hostname: ${EUREKA_INSTANCE_HOSTNAME:user-service-container}
+    prefer-ip-address: true
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: 3600000
+
+  admin:
+    email: admin@tickethub.com
+    password: ${INITIAL_ADMIN_PASSWORD}

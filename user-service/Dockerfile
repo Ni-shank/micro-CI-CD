@@ -1,0 +1,11 @@
+FROM eclipse-temurin:21-jre
+
+LABEL authors="DELL"
+
+WORKDIR /app
+
+COPY target/*.jar app.jar
+
+EXPOSE 8090
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
