@@ -41,18 +41,32 @@ public class UserService {
         return UserResponse.from(findByEmail(email));
     }
 
+
     @Transactional
     public UserResponse updateMe(String email, UpdateProfileRequest req) {
         User user = findByEmail(email);
-        String phone = (req.phone() == null || req.phone().isBlank()) ? null : req.phone().trim();
-        if (phone != null && !phone.equals(user.getPhone()) && userRepository.existsByPhone(phone)) {
+
+        String phone = (req.phone() == null || req.phone().isBlank())
+                ? null
+                : req.phone().trim();
+
+        if (phone != null
+                && !phone.equals(user.getPhone())
+                && userRepository.existsByPhone(phone)) {
             throw new ConflictException("Phone number is already registered");
         }
+
         user.setFirstName(req.firstName().trim());
         user.setLastName(req.lastName().trim());
         user.setPhone(phone);
+
+        // Flush changes so JPA auditing can update updatedBy and updatedAt
+        userRepository.flush();
+
+        // Return the response after auditing fields have been updated
         return UserResponse.from(user);
     }
+
 
     @Transactional
     public void changePassword(String email, ChangePasswordRequest req) {
@@ -89,21 +103,39 @@ public class UserService {
     }
 
     /** Replaces the user's roles with exactly the given set. */
+
     @Transactional
     public UserResponse assignRoles(Long id, Set<RoleName> roleNames, String actingEmail) {
         User user = findById(id);
-        if (user.getEmail().equalsIgnoreCase(actingEmail) && !roleNames.contains(RoleName.ADMIN)) {
-            throw new BadRequestException("You cannot remove your own ADMIN role");
+
+        if (user.getEmail().equalsIgnoreCase(actingEmail)
+                && !roleNames.contains(RoleName.ADMIN)) {
+            throw new BadRequestException(
+                    "You cannot remove your own ADMIN role");
         }
+
         user.clearRoles();
-        userRepository.flush(); // delete old mapping rows first so re-adding the same role does not clash
+
+        // Delete old role mappings before adding replacements.
+        userRepository.flush();
+
         for (RoleName name : roleNames) {
             Role role = roleRepository.findByName(name)
-                    .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + name));
+                    .orElseThrow(() ->
+                            new ResourceNotFoundException("Role not found: " + name));
+
             user.addRole(role);
         }
-        return UserResponse.from(userRepository.save(user));
+
+        // Explicitly mark the parent User entity as modified.
+        user.markUpdatedBy(actingEmail);
+
+        // Flush changes before creating the response.
+        userRepository.flush();
+
+        return UserResponse.from(user);
     }
+
 
     @Transactional
     public UserResponse deleteUser(Long id, String actingEmail) {

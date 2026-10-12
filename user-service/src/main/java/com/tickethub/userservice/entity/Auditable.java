@@ -1,3 +1,4 @@
+
 package com.tickethub.userservice.entity;
 
 import jakarta.persistence.Column;
@@ -11,10 +12,6 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
-/**
- * Base class that gives every entity the four audit columns.
- * Spring Data fills them automatically (see AuditingConfig).
- */
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
 public abstract class Auditable {
@@ -35,8 +32,28 @@ public abstract class Auditable {
     @Column(name = "updated_by")
     private String updatedBy;
 
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public String getCreatedBy() { return createdBy; }
-    public String getUpdatedBy() { return updatedBy; }
+    /**
+     * Explicitly mark this entity as modified when a relationship change
+     * does not otherwise dirty the parent entity.
+     */
+    public void markUpdatedBy(String email) {
+        this.updatedBy = email;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
+    public String getUpdatedBy() {
+        return updatedBy;
+    }
 }
