@@ -9,8 +9,10 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 /**
  * Starts the real gateway (without Eureka) and checks the rules that do not need any other service to be running.
  */
+
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {"eureka.client.enabled=false", "gateway.rate-limit.enabled=false"})
+        properties = {"eureka.client.enabled=false", "gateway.rate-limit.enabled=false",
+                "gateway.security.jwt-secret=test-only-gateway-secret-for-integration-tests-2026"})
 @AutoConfigureWebTestClient
 class GatewaySecurityIntegrationTest {
 
